@@ -41,6 +41,16 @@ app.setErrorHandler((error, request, reply) => {
   if (reply.sent) return
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (
+      error.code === 'P1001' ||
+      error.code === 'P1017' ||
+      error.code === 'P1011'
+    ) {
+      return reply.status(503).send({
+        message:
+          'The database refused the connection. Check DATABASE_URL, that Postgres is reachable, and (Neon) that the project is not paused.',
+      })
+    }
     if (error.code === 'P2002') {
       return reply.status(409).send({
         message: 'This email is already registered. Try signing in instead.',
@@ -75,7 +85,7 @@ app.setErrorHandler((error, request, reply) => {
   if (error instanceof Prisma.PrismaClientInitializationError) {
     return reply.status(503).send({
       message:
-        'We could not reach the database. Please try again in a few minutes.',
+        'The API could not open a database connection. Verify DATABASE_URL in .env, run prisma migrate deploy, and restart the server.',
     })
   }
 
