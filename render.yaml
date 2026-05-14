@@ -1,0 +1,10 @@
+# Render Blueprint (optional): add to repo root, or set the same commands in the Render dashboard.
+# Monorepo: set rootDir to your API folder, e.g. rootDir: backend
+services:
+  - type: web
+    name: walfeed-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health

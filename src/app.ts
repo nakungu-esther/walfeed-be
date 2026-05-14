@@ -23,6 +23,13 @@ app.register(jwt, {
   secret: process.env.JWT_SECRET || 'secret',
 })
 
+app.get('/', async (_req, reply) => {
+  return reply.send({
+    service: 'WalFeed API',
+    docs: 'Use /api/health for readiness. API routes are under /api/*.',
+  })
+})
+
 app.register(authRoutes, { prefix: '/api/auth' })
 app.register(configRoutes, { prefix: '/api/config' })
 app.register(formRoutes, { prefix: '/api/forms' })
