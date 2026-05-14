@@ -12,41 +12,78 @@ export async function register(req: FastifyRequest, reply: FastifyReply) {
   const body = req.body as AuthBody
 
   if (!body?.email || !body?.password) {
-    return reply.status(400).send({ message: 'email and password are required' })
+    return reply
+      .status(400)
+      .send({ message: 'Please enter your email and password.' })
   }
 
-  const hashedPassword = await hashPassword(body.password)
+  const email = String(body.email).trim().toLowerCase()
+  const password = String(body.password)
+
+  if (!email || !password) {
+    return reply
+      .status(400)
+      .send({ message: 'Please enter your email and password.' })
+  }
+
+  if (password.length < 8) {
+    return reply.status(400).send({
+      message: 'Please use a password of at least 8 characters.',
+    })
+  }
+
+  const hashedPassword = await hashPassword(password)
 
   const user = await prisma.user.create({
     data: {
-      email: body.email,
+      email,
       password: hashedPassword,
     },
     select: { id: true, email: true, createdAt: true },
   })
 
-  return reply.send(user)
+  const token = await reply.jwtSign({
+    id: user.id,
+    email: user.email,
+  })
+
+  return reply.send({
+    token,
+    user: { id: user.id, email: user.email },
+    createdAt: user.createdAt,
+  })
 }
 
 export async function login(req: FastifyRequest, reply: FastifyReply) {
   const body = req.body as AuthBody
 
   if (!body?.email || !body?.password) {
-    return reply.status(400).send({ message: 'email and password are required' })
+    return reply
+      .status(400)
+      .send({ message: 'Please enter your email and password.' })
+  }
+
+  const email = String(body.email).trim().toLowerCase()
+  const password = String(body.password)
+
+  if (!email || !password) {
+    return reply
+      .status(400)
+      .send({ message: 'Please enter your email and password.' })
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: body.email },
+    where: { email },
   })
 
   if (!user) {
-    return reply.status(404).send({ message: 'User not found' })
+    return reply.status(404).send({ message: 'No account was found for this email.' })
   }
 
-  const validPassword = await comparePassword(body.password, user.password)
+  const validPassword = await comparePassword(password, user.password)
 
   if (!validPassword) {
-    return reply.status(401).send({ message: 'Invalid credentials' })
+    return reply.status(401).send({ message: 'That email or password is incorrect.' })
   }
 
   const token = await reply.jwtSign({
@@ -54,5 +91,8 @@ export async function login(req: FastifyRequest, reply: FastifyReply) {
     email: user.email,
   })
 
-  return reply.send({ token })
+  return reply.send({
+    token,
+    user: { id: user.id, email: user.email },
+  })
 }

@@ -1,6 +1,8 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 
 import { prisma } from '../config/prisma'
+import { jwtUser } from '../utils/requireAuth'
+import { resolveListScope } from '../utils/listScope'
 
 type CreateFormBody = {
   title?: string
@@ -10,12 +12,14 @@ type CreateFormBody = {
 }
 
 export async function createForm(req: FastifyRequest, reply: FastifyReply) {
+  const user = jwtUser(req)
   const body = req.body as CreateFormBody
 
-  if (!body?.title || !body?.userId || body.fields === undefined) {
-    return reply
-      .status(400)
-      .send({ message: 'title, userId, and fields are required' })
+  if (!body?.title || body.fields === undefined) {
+    return reply.status(400).send({
+      message:
+        'Please give your form a title, add at least one field, then try saving again.',
+    })
   }
 
   const form = await prisma.form.create({
@@ -23,18 +27,46 @@ export async function createForm(req: FastifyRequest, reply: FastifyReply) {
       title: body.title,
       description: body.description,
       fields: body.fields as object,
-      userId: body.userId,
+      userId: user.id,
     },
   })
 
   return reply.send(form)
 }
 
-export async function getForms(_req: FastifyRequest, _reply: FastifyReply) {
-  return prisma.form.findMany({
+export async function getForms(req: FastifyRequest, reply: FastifyReply) {
+  const scope = await resolveListScope(req)
+  if (scope.kind === 'unauthorized') {
+    return reply.status(401).send({
+      message: 'Your session has expired. Please sign in again.',
+    })
+  }
+  const where = scope.kind === 'owner' ? { userId: scope.userId } : {}
+
+  const forms = await prisma.form.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { submissions: true } },
     },
   })
+  return reply.send(forms)
+}
+
+export async function getFormById(req: FastifyRequest, reply: FastifyReply) {
+  const id = (req.params as { id: string }).id
+  const form = await prisma.form.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      fields: true,
+      createdAt: true,
+    },
+  })
+  if (!form) {
+    return reply.status(404).send({ message: 'This form could not be found.' })
+  }
+  return reply.send(form)
 }

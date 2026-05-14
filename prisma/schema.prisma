@@ -24,6 +24,8 @@ model Form {
   user        User          @relation(fields: [userId], references: [id])
   submissions Submission[]
   createdAt   DateTime      @default(now())
+
+  @@index([userId])
 }
 
 model Submission {
@@ -32,5 +34,10 @@ model Submission {
   form       Form     @relation(fields: [formId], references: [id])
   data       Json
   walrusHash String?
+  adminNote  String?
+  priority   String?
   createdAt  DateTime @default(now())
+
+  @@index([formId])
+  @@index([createdAt])
 }

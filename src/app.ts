@@ -42,29 +42,48 @@ app.setErrorHandler((error, request, reply) => {
 
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === 'P2002') {
-      return reply
-        .status(409)
-        .send({ message: 'A record with this value already exists.' })
+      return reply.status(409).send({
+        message: 'This email is already registered. Try signing in instead.',
+      })
     }
     if (error.code === 'P2003') {
       return reply.status(400).send({
-        message: 'Invalid reference: related record does not exist.',
+        message: 'Something in your request is no longer available. Refresh the page and try again.',
       })
     }
     if (error.code === 'P2025') {
-      return reply.status(404).send({ message: 'Record not found.' })
+      return reply.status(404).send({ message: 'We could not find that item.' })
+    }
+    if (error.code === 'P2022' || error.code === 'P2021') {
+      return reply.status(503).send({
+        message:
+          'The database is missing recent tables or columns. From the backend project folder, run: npx prisma migrate deploy',
+      })
     }
   }
 
+  if (
+    error instanceof Prisma.PrismaClientUnknownRequestError &&
+    /column|does not exist|42703/i.test(error.message)
+  ) {
+    return reply.status(503).send({
+      message:
+        'The database is missing recent tables or columns. From the backend project folder, run: npx prisma migrate deploy',
+    })
+  }
+
   if (error instanceof Prisma.PrismaClientInitializationError) {
-    return reply
-      .status(503)
-      .send({ message: 'Database is unavailable. Check DATABASE_URL.' })
+    return reply.status(503).send({
+      message:
+        'We could not reach the database. Please try again in a few minutes.',
+    })
   }
 
   if (error instanceof Prisma.PrismaClientRustPanicError) {
     request.log.error(error)
-    return reply.status(503).send({ message: 'Database driver error.' })
+    return reply.status(503).send({
+      message: 'A storage issue occurred. Please try again shortly.',
+    })
   }
 
   const status =
@@ -74,11 +93,13 @@ app.setErrorHandler((error, request, reply) => {
 
   if (status >= 500) {
     request.log.error(error)
+    return reply.status(status).send({
+      message: 'Something went wrong. Please try again shortly.',
+    })
   }
 
   return reply.status(status).send({
-    message:
-      error instanceof Error ? error.message : 'Request failed. Try again.',
+    message: 'We could not complete that action. Please try again.',
   })
 })
 
