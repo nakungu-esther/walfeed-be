@@ -36,11 +36,24 @@ app.register(formRoutes, { prefix: '/api/forms' })
 app.register(submissionRoutes, { prefix: '/api/submissions' })
 
 app.get('/api/health', async (_req, reply) => {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return reply.status(503).send({
+      ok: false,
+      database: 'not_configured',
+      message:
+        'DATABASE_URL is not set. Add it in your host environment variables (e.g. Render → Environment), redeploy, then run prisma migrate deploy against that database.',
+    })
+  }
   try {
     await prisma.$queryRaw`SELECT 1`
     return reply.send({ ok: true, database: 'up' })
   } catch {
-    return reply.status(503).send({ ok: false, database: 'down' })
+    return reply.status(503).send({
+      ok: false,
+      database: 'down',
+      message:
+        'The database did not respond. Check DATABASE_URL (pooler URL for Neon), that the database is awake, and that migrations have been applied.',
+    })
   }
 })
 
@@ -92,7 +105,7 @@ app.setErrorHandler((error, request, reply) => {
   if (error instanceof Prisma.PrismaClientInitializationError) {
     return reply.status(503).send({
       message:
-        'The API could not open a database connection. Verify DATABASE_URL in .env, run prisma migrate deploy, and restart the server.',
+        'The API could not open a database connection. Set DATABASE_URL in your deployment environment (Render, Fly.io, etc.), run prisma migrate deploy, then redeploy or restart.',
     })
   }
 
